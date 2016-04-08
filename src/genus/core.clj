@@ -1,7 +1,8 @@
 (ns genus.core
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [genus.model :as model]))
 
-(def min-prob 0.00001)
+(def min-prob 0.000001)
 
 (defn posterior-prob
   "for each classification this
@@ -12,9 +13,9 @@
   [{:keys [classes all]} prior-prob word]
   (let [start-prob (/ 1 (count classes))]
     (into {}
-          (for [class classes]
+          (for [[class word-probs] classes]
             (let [pe (get all word min-prob)
-                  peh (get class word min-prob)
+                  peh (get word-probs word min-prob)
                   ph (get prior-prob class start-prob)]
               [class (/ (* peh ph) pe)])))))
 
@@ -25,10 +26,13 @@
           words))
 
 
-(defn classify [model line]
-  (let [words (str/split line #" |\.|:|,|!|;")
-        probs (bayesian-inference model words)
-        [[class prob]] (reverse (sort-by second probs))]
-    (if (>= prob (get-in model [:thresholds class]))
-      class
-      :unknown)))
+(defn classify
+  ([model content]
+   (classify model content model/default-tokenizer))
+  ([model content tokenizer]
+   (let [words (tokenizer content)
+         probs (bayesian-inference model words)
+         [[class prob]] (reverse (sort-by second probs))]
+     (if (>= prob (get-in model [:thresholds class] min-prob))
+       class
+       :unknown))))
